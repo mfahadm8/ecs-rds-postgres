@@ -1,5 +1,5 @@
-aws_account: "384549422462"
-aws_region: us-east-1
+aws_account: "354789122408"
+aws_region: eu-west-2
 
 domain:
   domain_name: dev.thefilmdb.io

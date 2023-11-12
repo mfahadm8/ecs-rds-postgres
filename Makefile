@@ -36,4 +36,4 @@ destroy:
 	@cdk destroy -c stage=$(STAGE) $(STACK)-$(STAGE)
 
 bootstrapp-cdk-toolkit:
-	@cdk bootstrap aws://$(shell cat config/$(STAGE).yaml | yq -r '.awsAccount')/$(shell cat config/$(STAGE).yaml | yq -r '.aws_region') -c stage=$(STAGE)
+	@cdk bootstrap aws://354789122408/$(REGION) -c stage=$(STAGE)

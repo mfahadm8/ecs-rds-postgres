@@ -286,31 +286,31 @@ class Ecs(Construct):
         db_name = SsmParameterFetcher(
             self,
             "SSMDefaultDB",
-            region=self._config["region"],
+            region=self._config["aws_region"],
             parameter_name="/thedb/db/defaultdb",
         )
         db_host = SsmParameterFetcher(
             self,
             "SSMDbHost",
-            region=self._config["region"],
+            region=self._config["aws_region"],
             parameter_name="/thedb/db/host",
         )
         db_port = SsmParameterFetcher(
             self,
             "SSMDbPort",
-            region=self._config["region"],
+            region=self._config["aws_region"],
             parameter_name="/thedb/db/port",
         )
         db_user = SsmParameterFetcher(
             self,
             "SSMDbUser",
-            region=self._config["region"],
+            region=self._config["aws_region"],
             parameter_name="/thedb/db/user",
         )
         db_password = SsmParameterFetcher(
             self,
             "SSMDbPassword",
-            region=self._config["region"],
+            region=self._config["aws_region"],
             parameter_name="/thedb/db/password",
         )
         backend_repository = ecr.Repository.from_repository_arn(
