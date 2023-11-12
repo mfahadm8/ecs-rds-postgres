@@ -1,0 +1,61 @@
+aws_account: "384549422462"
+aws_region: af-south-1
+
+domain:
+  domain_name: thefilmdb.io
+
+network:
+  vpc:
+    cidr: 10.1.0.0/16
+    create_natgateway: 1
+    natGatewaySubnetName: Public
+
+  subnets:
+    # Backend subnet
+    - cidrMask: 21
+      name: Private
+      subnetType: PRIVATE_WITH_EGRESS
+    # Client UI subnet
+    - cidrMask: 21
+      name: Public
+      subnetType: PUBLIC
+
+compute:
+  cognito:
+    user_pood_id: us-east-1_qeG3IyrM8
+    react_app_client_id: 5jqlpbbhbbti745433fg7vtpa0
+
+  s3:
+    blob_bucket: thedb-blob
+
+  ecs:
+    enable_auto_shutdown: True
+    backend:
+      repo_arn: "arn:aws:ecr:us-east-1:384549422462:repository/thedb/api"
+      image_tag: "dev-latest"
+      port: 8080
+      cpu: 512
+      memory: 1024
+      minimum_containers: 1
+      maximum_containers: 10
+      fargate_spot:
+        weight: 75
+        base: 0
+      fargate:
+        weight: 25
+        base: 1
+
+    client_webapp:
+      repo_arn: "arn:aws:ecr:us-east-1:384549422462:repository/thedb/client_webapp"
+      image_tag: "dev-latest"
+      port: 80
+      cpu: 1024
+      memory: 2048
+      minimum_containers: 1
+      maximum_containers: 10
+      fargate_spot:
+        weight: 75
+        base: 0
+      fargate:
+        weight: 25
+        base: 1

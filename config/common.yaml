@@ -1,0 +1,23 @@
+name: theDBCloud
+tags:
+  app: theDBCloud
+
+domain:
+  hostedzone_id: Z0276655BOEFA0BY017M
+  hostedzone_name: thefilmdb.io
+  cert_arn: arn:aws:acm:eu-west-2:354789122408:certificate/18c3a35f-f29a-49b6-a452-83b7df8cb325
+
+network:
+  vpc:
+    natGatewaySubnetName: Public
+    maxAzs: 3
+
+  subnets:
+    # Backend subnet
+    - cidrMask: 21
+      name: Private
+      subnetType: PRIVATE_WITH_EGRESS
+    # Client UI subnet
+    - cidrMask: 21
+      name: Public
+      subnetType: PUBLIC
