@@ -44,6 +44,7 @@ class Ecs(Construct):
         # Create cluster worker nodes
         self.__create_client_ui_service()
         self.__create_backend_service()
+        self.__setup_application_load_balancer()
 
     def __create_ecs_cluster(self):
         # Create ECS cluster
@@ -84,7 +85,7 @@ class Ecs(Construct):
                 tag=self._config["compute"]["ecs"]["client_webapp"]["image_tag"],
             ),
             environment={
-                "REACT_APP_BACKEND_URL": f"http://backendserver.{self.namespace.namespace_name}:8000",
+                "REACT_APP_BACKEND_URL": f"https://"+self._config["domain"]["backend_domain"],
             },
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="clientwebapp",
@@ -179,8 +180,6 @@ class Ecs(Construct):
             datapoints_to_alarm=6,
         )
 
-        self.__setup_application_load_balancer()
-
     def __setup_application_load_balancer(self):
         # Create security group for the load balancer
         lb_security_group = ec2.SecurityGroup(
@@ -208,9 +207,9 @@ class Ecs(Construct):
         )
 
         # Create target group
-        target_group = elbv2.ApplicationTargetGroup(
+        frontend_target_group = elbv2.ApplicationTargetGroup(
             self,
-            "TargetGroup",
+            "FrontendTargetGroup",
             vpc=self._cluster.vpc,
             port=3000,
             protocol=elbv2.ApplicationProtocol.HTTP,
@@ -219,6 +218,24 @@ class Ecs(Construct):
                 path="/",
                 protocol=elbv2.Protocol.HTTP,
                 port="3000",
+                interval=Duration.seconds(60),
+                timeout=Duration.seconds(30),
+                healthy_threshold_count=2,
+                unhealthy_threshold_count=5,
+            ),
+        )
+
+        backend_target_group = elbv2.ApplicationTargetGroup(
+            self,
+            "BackendTargetGroup",
+            vpc=self._cluster.vpc,
+            port=8000,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            targets=[self._backend_service],
+            health_check=elbv2.HealthCheck(
+                path="/vfx",
+                protocol=elbv2.Protocol.HTTP,
+                port="8000",
                 interval=Duration.seconds(60),
                 timeout=Duration.seconds(30),
                 healthy_threshold_count=2,
@@ -245,7 +262,7 @@ class Ecs(Construct):
             "HttpsListener",
             port=443,
             protocol=elbv2.ApplicationProtocol.HTTPS,
-            default_target_groups=[target_group],
+            default_target_groups=[frontend_target_group],
         )
 
         # Add listener certificate (assuming you have a certificate in AWS Certificate Manager)
@@ -256,6 +273,28 @@ class Ecs(Construct):
             ],
         )
 
+        # Create the listener rule
+        rule = elbv2.CfnListenerRule(
+            self,
+            "ListenerRule",
+            listener_arn=https_listener.listener_arn,
+            priority=1,
+            actions=[
+                elbv2.CfnListenerRule.ActionProperty(
+                    type="forward",
+                    target_group_arn =backend_target_group.target_group_arn,
+                )
+            ],
+            conditions=[
+                elbv2.CfnListenerRule.RuleConditionProperty(
+                    field="host-header",
+                    values=[self._config["domain"]["backend_domain"]]
+                )
+            ],
+        )
+        
+        rule.add_dependency(backend_target_group.node.default_child)
+
         hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
             self,
             "hostedZone",
@@ -265,9 +304,19 @@ class Ecs(Construct):
 
         route53.ARecord(
             self,
-            "ALBRecord",
+            "FrontendALBRecord",
             zone=hosted_zone,
-            record_name=self._config["domain"]["domain_name"],
+            record_name=self._config["domain"]["frontend_domain"],
+            target=route53.RecordTarget.from_alias(
+                route53_targets.LoadBalancerTarget(self.lb)
+            ),
+        )
+
+        route53.ARecord(
+            self,
+            "BackendALBRecord",
+            zone=hosted_zone,
+            record_name=self._config["domain"]["backend_domain"],
             target=route53.RecordTarget.from_alias(
                 route53_targets.LoadBalancerTarget(self.lb)
             ),
@@ -352,6 +401,8 @@ class Ecs(Construct):
             ),
         )
 
+        backend_container.add_port_mappings(ecs.PortMapping(container_port=8000))
+        
         capacity = [
             ecs.CapacityProviderStrategy(
                 capacity_provider="FARGATE_SPOT",
@@ -385,9 +436,10 @@ class Ecs(Construct):
             },
         )
 
-        self._backend_service.connections.allow_from(
-            self._client_webapp_service, ec2.Port.tcp(8080)
+        self._backend_service.connections.allow_from_any_ipv4(
+         ec2.Port.tcp(8000)
         )
+        
 
         # Enable auto scaling for the backend service
         scaling = autoscaling.ScalableTarget(

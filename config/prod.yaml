@@ -2,8 +2,9 @@ aws_account: "354789122408"
 aws_region: eu-west-2
 
 domain:
-  domain_name: thefilmdb.io
-
+  frontend_domain: thefilmdb.io
+  backend_domain: api.thefilmdb.io
+  
 network:
   vpc:
     cidr: 10.1.0.0/16
@@ -21,41 +22,31 @@ network:
       subnetType: PUBLIC
 
 compute:
-  cognito:
-    user_pood_id: us-east-1_qeG3IyrM8
-    react_app_client_id: 5jqlpbbhbbti745433fg7vtpa0
-
-  s3:
-    blob_bucket: thedb-blob
-
   ecs:
-    enable_auto_shutdown: True
     backend:
-      repo_arn: "arn:aws:ecr:us-east-1:384549422462:repository/thedb/api"
-      image_tag: "dev-latest"
-      port: 8080
-      cpu: 512
-      memory: 1024
+      repo_arn: "arn:aws:ecr:eu-west-2:354789122408:repository/thedb-backend"
+      image_tag: "latest"
+      cpu: 256
+      memory: 512
       minimum_containers: 1
-      maximum_containers: 10
+      maximum_containers: 3
       fargate_spot:
-        weight: 75
+        weight: 0
         base: 0
       fargate:
-        weight: 25
-        base: 1
+        weight: 1
+        base: 100
 
     client_webapp:
-      repo_arn: "arn:aws:ecr:us-east-1:384549422462:repository/thedb/client_webapp"
-      image_tag: "dev-latest"
-      port: 80
+      repo_arn: "arn:aws:ecr:eu-west-2:354789122408:repository/thedb-frontend"
+      image_tag: "latest"
       cpu: 1024
       memory: 2048
       minimum_containers: 1
-      maximum_containers: 10
+      maximum_containers: 3
       fargate_spot:
-        weight: 75
+        weight: 0
         base: 0
       fargate:
-        weight: 25
+        weight: 100
         base: 1
