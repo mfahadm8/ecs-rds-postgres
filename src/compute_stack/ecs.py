@@ -230,7 +230,7 @@ class Ecs(Construct):
             "BackendTargetGroup",
             vpc=self._cluster.vpc,
             port=8000,
-            protocol=elbv2.ApplicationProtocol.HTTP,
+            protocol=elbv2.ApplicationProtocol.HTTPS,
             targets=[self._backend_service],
             health_check=elbv2.HealthCheck(
                 path="/vfx",
