@@ -61,7 +61,12 @@ class Ecs(Construct):
 
     def __create_client_ui_service(self):
         # Create Fargate task definition for ui
-
+        react_app_api_key = SsmParameterFetcher(
+            self,
+            "SSMReactAppApiKey",
+            region=self._config["aws_region"],
+            parameter_name="/thedb/frontend/apikey",
+        )
         # Import ECR repository for ui
 
         client_ui_repository = ecr.Repository.from_repository_arn(
@@ -86,6 +91,7 @@ class Ecs(Construct):
             ),
             environment={
                 "REACT_APP_BACKEND_URL": f"https://"+self._config["domain"]["backend_domain"],
+                "REACT_APP_API_KEY":react_app_api_key.get_parameter()
             },
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="clientwebapp",
@@ -230,12 +236,13 @@ class Ecs(Construct):
             "BackendTargetGroup",
             vpc=self._cluster.vpc,
             port=8000,
-            protocol=elbv2.ApplicationProtocol.HTTPS,
+            protocol=elbv2.ApplicationProtocol.HTTP,
             targets=[self._backend_service],
             health_check=elbv2.HealthCheck(
                 path="/vfx",
                 protocol=elbv2.Protocol.HTTP,
                 port="8000",
+                healthy_http_codes="301",
                 interval=Duration.seconds(60),
                 timeout=Duration.seconds(30),
                 healthy_threshold_count=2,
