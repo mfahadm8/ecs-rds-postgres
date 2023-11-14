@@ -369,6 +369,14 @@ class Ecs(Construct):
             region=self._config["aws_region"],
             parameter_name="/thedb/db/password",
         )
+
+        react_app_api_key = SsmParameterFetcher(
+            self,
+            "SSMReactAppApiKey2",
+            region=self._config["aws_region"],
+            parameter_name="/thedb/frontend/apikey",
+        )
+
         backend_repository = ecr.Repository.from_repository_arn(
             self,
             "BackendECRRepo",
@@ -395,6 +403,7 @@ class Ecs(Construct):
                 "DB_NAME": db_name.get_parameter(),
                 "DB_PASSWORD": db_password.get_parameter(),
                 "DB_USER": db_user.get_parameter(),
+                "API_KEY": react_app_api_key.get_parameter()
             },
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="backend",
