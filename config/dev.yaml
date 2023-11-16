@@ -44,3 +44,6 @@ compute:
       fargate:
         weight: 0
         base: 0
+
+    db:
+      az: eu-west-2c

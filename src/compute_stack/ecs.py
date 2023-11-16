@@ -445,6 +445,7 @@ class Ecs(Construct):
             service_name="backendserver-" + self._config["stage"],
             task_definition=backendserver_taskdef,
             assign_public_ip=True,
+            vpc_subnets=ec2.SubnetSelection(availability_zones=[self._config["compute"]["ecs"]["db"]["az"]]),
             capacity_provider_strategies=capacity,
             cloud_map_options={
                 "name": "backendserver-" + self._config["stage"],
@@ -486,3 +487,4 @@ class Ecs(Construct):
             evaluation_periods=10,
             datapoints_to_alarm=6,
         )
+

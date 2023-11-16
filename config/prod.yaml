@@ -50,3 +50,7 @@ compute:
       fargate:
         weight: 100
         base: 1
+
+
+    db:
+      az: eu-west-2c
