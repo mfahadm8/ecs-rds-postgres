@@ -44,6 +44,7 @@ class Ecs(Construct):
         # Create cluster worker nodes
         self.__create_client_ui_service()
         self.__create_backend_service()
+        self.__create_redis_service()
         self.__setup_application_load_balancer()
 
     def __create_ecs_cluster(self):
@@ -469,6 +470,112 @@ class Ecs(Construct):
                 "minimum_containers"
             ],
             max_capacity=self._config["compute"]["ecs"]["backend"][
+                "maximum_containers"
+            ],
+        )
+
+        scaling.scale_on_metric(
+            "ScaleToCPUWithMultipleDatapoints",
+            metric=cloudwatch.Metric(
+                namespace="AWS/ECS",
+                metric_name="CPUUtilization",
+            ),
+            scaling_steps=[
+                autoscaling.ScalingInterval(change=-1, lower=10),
+                autoscaling.ScalingInterval(change=+1, lower=50),
+                autoscaling.ScalingInterval(change=+3, lower=70),
+            ],
+            evaluation_periods=10,
+            datapoints_to_alarm=6,
+        )
+
+    def __create_redis_service(self):
+
+
+        redis_repository = ecr.Repository.from_repository_name(
+            self,
+            "BackendECRRepo",
+            repository_arn=self._config["compute"]["ecs"]["redis"]["repo"],
+        )
+        # Create Fargate task definition for backendserver
+
+        redis_taskdef = ecs.FargateTaskDefinition(
+            self,
+            "backend-taskdef",
+            memory_limit_mib=self._config["compute"]["ecs"]["redis"]["memory"],
+            cpu=self._config["compute"]["ecs"]["redis"]["cpu"],
+        )
+
+        redis_container = redis_taskdef.add_container(
+            "backend-container",
+            image=ecs.ContainerImage.from_ecr_repository(
+                redis_repository,
+                tag=self._config["compute"]["ecs"]["redis"]["image_tag"],
+            ),
+            logging=ecs.LogDriver.aws_logs(
+                stream_prefix="redis",
+                log_group=aws_logs.LogGroup(
+                    self,
+                    "RedisServerLogGroup",
+                    log_group_name="/ecs/redis-server",
+                    retention=aws_logs.RetentionDays.ONE_WEEK,
+                    removal_policy=RemovalPolicy.DESTROY,
+                ),
+            ),
+        )
+
+        redis_container.add_port_mappings(ecs.PortMapping(container_port=6379))
+        
+        capacity = [
+            ecs.CapacityProviderStrategy(
+                capacity_provider="FARGATE_SPOT",
+                weight=self._config["compute"]["ecs"]["redis"]["fargate_spot"][
+                    "weight"
+                ],
+                base=self._config["compute"]["ecs"]["redis"]["fargate_spot"]["base"],
+            ),
+            ecs.CapacityProviderStrategy(
+                capacity_provider="FARGATE",
+                weight=self._config["compute"]["ecs"]["redis"]["fargate"]["weight"],
+                base=self._config["compute"]["ecs"]["redis"]["fargate"]["base"],
+            ),
+        ]
+
+        # Create standard Fargate service for backendserver
+        self._redis_service = ecs.FargateService(
+            self,
+            "backend-service",
+            cluster=self._cluster,
+            desired_count=self._config["compute"]["ecs"]["backend"][
+                "minimum_containers"
+            ],
+            service_name="redisserver-" + self._config["stage"],
+            task_definition=redis_taskdef,
+            assign_public_ip=True,
+            vpc_subnets=ec2.SubnetSelection(availability_zones=[self._config["compute"]["ecs"]["db"]["az"]]),
+            capacity_provider_strategies=capacity,
+            cloud_map_options={
+                "name": "backendserver-" + self._config["stage"],
+                "cloud_map_namespace": self.namespace,
+            },
+        )
+
+        self._redis_service.connections.allow_from_any_ipv4(
+         ec2.Port.tcp(6379)
+        )
+        
+
+        # Enable auto scaling for the backend service
+        scaling = autoscaling.ScalableTarget(
+            self,
+            "redis-scaling",
+            service_namespace=autoscaling.ServiceNamespace.ECS,
+            resource_id=f"service/{self._cluster.cluster_name}/{self._redis_service.service_name}",
+            scalable_dimension="ecs:service:DesiredCount",
+            min_capacity=self._config["compute"]["ecs"]["redis"][
+                "minimum_containers"
+            ],
+            max_capacity=self._config["compute"]["ecs"]["redis"][
                 "maximum_containers"
             ],
         )

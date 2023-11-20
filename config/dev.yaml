@@ -45,5 +45,20 @@ compute:
         weight: 0
         base: 0
 
+
+    redis:
+      repo: "redis"
+      image_tag: "alpine"
+      cpu: 1024
+      memory: 2048
+      minimum_containers: 1
+      maximum_containers: 3
+      fargate_spot:
+        weight: 100
+        base: 1
+      fargate:
+        weight: 0
+        base: 0
+
     db:
       az: eu-west-2c
