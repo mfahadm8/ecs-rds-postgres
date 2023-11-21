@@ -494,20 +494,20 @@ class Ecs(Construct):
 
         redis_repository = ecr.Repository.from_repository_name(
             self,
-            "BackendECRRepo",
+            "RedisECRRepo",
             repository_arn=self._config["compute"]["ecs"]["redis"]["repo"],
         )
-        # Create Fargate task definition for backendserver
+        # Create Fargate task definition for redisserver
 
         redis_taskdef = ecs.FargateTaskDefinition(
             self,
-            "backend-taskdef",
+            "redis-taskdef",
             memory_limit_mib=self._config["compute"]["ecs"]["redis"]["memory"],
             cpu=self._config["compute"]["ecs"]["redis"]["cpu"],
         )
 
         redis_container = redis_taskdef.add_container(
-            "backend-container",
+            "redis-container",
             image=ecs.ContainerImage.from_ecr_repository(
                 redis_repository,
                 tag=self._config["compute"]["ecs"]["redis"]["image_tag"],
@@ -541,12 +541,12 @@ class Ecs(Construct):
             ),
         ]
 
-        # Create standard Fargate service for backendserver
+        # Create standard Fargate service for redisserver
         self._redis_service = ecs.FargateService(
             self,
-            "backend-service",
+            "redis-service",
             cluster=self._cluster,
-            desired_count=self._config["compute"]["ecs"]["backend"][
+            desired_count=self._config["compute"]["ecs"]["redis"][
                 "minimum_containers"
             ],
             service_name="redisserver-" + self._config["stage"],
@@ -555,7 +555,7 @@ class Ecs(Construct):
             vpc_subnets=ec2.SubnetSelection(availability_zones=[self._config["compute"]["ecs"]["db"]["az"]]),
             capacity_provider_strategies=capacity,
             cloud_map_options={
-                "name": "backendserver-" + self._config["stage"],
+                "name": "redisserver-" + self._config["stage"],
                 "cloud_map_namespace": self.namespace,
             },
         )
@@ -565,7 +565,7 @@ class Ecs(Construct):
         )
         
 
-        # Enable auto scaling for the backend service
+        # Enable auto scaling for the redis service
         scaling = autoscaling.ScalableTarget(
             self,
             "redis-scaling",
