@@ -91,8 +91,9 @@ class Ecs(Construct):
                 tag=self._config["compute"]["ecs"]["client_webapp"]["image_tag"],
             ),
             environment={
-                "REACT_APP_BACKEND_URL": f"https://"+self._config["domain"]["backend_domain"],
-                "REACT_APP_API_KEY":react_app_api_key.get_parameter()
+                "REACT_APP_BACKEND_URL": f"https://"
+                + self._config["domain"]["backend_domain"],
+                "REACT_APP_API_KEY": react_app_api_key.get_parameter(),
             },
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="clientwebapp",
@@ -290,17 +291,17 @@ class Ecs(Construct):
             actions=[
                 elbv2.CfnListenerRule.ActionProperty(
                     type="forward",
-                    target_group_arn =backend_target_group.target_group_arn,
+                    target_group_arn=backend_target_group.target_group_arn,
                 )
             ],
             conditions=[
                 elbv2.CfnListenerRule.RuleConditionProperty(
                     field="host-header",
-                    values=[self._config["domain"]["backend_domain"]]
+                    values=[self._config["domain"]["backend_domain"]],
                 )
             ],
         )
-        
+
         rule.add_dependency(backend_target_group.node.default_child)
 
         hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
@@ -404,7 +405,7 @@ class Ecs(Construct):
                 "DB_NAME": db_name.get_parameter(),
                 "DB_PASSWORD": db_password.get_parameter(),
                 "DB_USER": db_user.get_parameter(),
-                "API_KEY": react_app_api_key.get_parameter()
+                "API_KEY": react_app_api_key.get_parameter(),
             },
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="backend",
@@ -419,7 +420,7 @@ class Ecs(Construct):
         )
 
         backend_container.add_port_mappings(ecs.PortMapping(container_port=8000))
-        
+
         capacity = [
             ecs.CapacityProviderStrategy(
                 capacity_provider="FARGATE_SPOT",
@@ -446,7 +447,9 @@ class Ecs(Construct):
             service_name="backendserver-" + self._config["stage"],
             task_definition=backendserver_taskdef,
             assign_public_ip=True,
-            vpc_subnets=ec2.SubnetSelection(availability_zones=[self._config["compute"]["ecs"]["db"]["az"]]),
+            vpc_subnets=ec2.SubnetSelection(
+                availability_zones=[self._config["compute"]["ecs"]["db"]["az"]]
+            ),
             capacity_provider_strategies=capacity,
             cloud_map_options={
                 "name": "backendserver-" + self._config["stage"],
@@ -454,10 +457,7 @@ class Ecs(Construct):
             },
         )
 
-        self._backend_service.connections.allow_from_any_ipv4(
-         ec2.Port.tcp(8000)
-        )
-        
+        self._backend_service.connections.allow_from_any_ipv4(ec2.Port.tcp(8000))
 
         # Enable auto scaling for the backend service
         scaling = autoscaling.ScalableTarget(
@@ -490,15 +490,6 @@ class Ecs(Construct):
         )
 
     def __create_redis_service(self):
-
-
-        redis_repository = ecr.Repository.from_repository_name(
-            self,
-            "RedisECRRepo",
-            repository_arn=self._config["compute"]["ecs"]["redis"]["repo"],
-        )
-        # Create Fargate task definition for redisserver
-
         redis_taskdef = ecs.FargateTaskDefinition(
             self,
             "redis-taskdef",
@@ -508,9 +499,10 @@ class Ecs(Construct):
 
         redis_container = redis_taskdef.add_container(
             "redis-container",
-            image=ecs.ContainerImage.from_ecr_repository(
-                redis_repository,
-                tag=self._config["compute"]["ecs"]["redis"]["image_tag"],
+            image=ecs.ContainerImage.from_registry(
+                self._config["compute"]["ecs"]["redis"]["repo"]
+                + ":"
+                + self._config["compute"]["ecs"]["redis"]["image_tag"]
             ),
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="redis",
@@ -525,7 +517,7 @@ class Ecs(Construct):
         )
 
         redis_container.add_port_mappings(ecs.PortMapping(container_port=6379))
-        
+
         capacity = [
             ecs.CapacityProviderStrategy(
                 capacity_provider="FARGATE_SPOT",
@@ -546,13 +538,13 @@ class Ecs(Construct):
             self,
             "redis-service",
             cluster=self._cluster,
-            desired_count=self._config["compute"]["ecs"]["redis"][
-                "minimum_containers"
-            ],
+            desired_count=self._config["compute"]["ecs"]["redis"]["minimum_containers"],
             service_name="redisserver-" + self._config["stage"],
             task_definition=redis_taskdef,
             assign_public_ip=True,
-            vpc_subnets=ec2.SubnetSelection(availability_zones=[self._config["compute"]["ecs"]["db"]["az"]]),
+            vpc_subnets=ec2.SubnetSelection(
+                availability_zones=[self._config["compute"]["ecs"]["db"]["az"]]
+            ),
             capacity_provider_strategies=capacity,
             cloud_map_options={
                 "name": "redisserver-" + self._config["stage"],
@@ -560,10 +552,7 @@ class Ecs(Construct):
             },
         )
 
-        self._redis_service.connections.allow_from_any_ipv4(
-         ec2.Port.tcp(6379)
-        )
-        
+        self._redis_service.connections.allow_from_any_ipv4(ec2.Port.tcp(6379))
 
         # Enable auto scaling for the redis service
         scaling = autoscaling.ScalableTarget(
@@ -572,12 +561,8 @@ class Ecs(Construct):
             service_namespace=autoscaling.ServiceNamespace.ECS,
             resource_id=f"service/{self._cluster.cluster_name}/{self._redis_service.service_name}",
             scalable_dimension="ecs:service:DesiredCount",
-            min_capacity=self._config["compute"]["ecs"]["redis"][
-                "minimum_containers"
-            ],
-            max_capacity=self._config["compute"]["ecs"]["redis"][
-                "maximum_containers"
-            ],
+            min_capacity=self._config["compute"]["ecs"]["redis"]["minimum_containers"],
+            max_capacity=self._config["compute"]["ecs"]["redis"]["maximum_containers"],
         )
 
         scaling.scale_on_metric(
@@ -594,4 +579,3 @@ class Ecs(Construct):
             evaluation_periods=10,
             datapoints_to_alarm=6,
         )
-
