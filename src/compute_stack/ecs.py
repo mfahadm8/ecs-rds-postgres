@@ -94,6 +94,9 @@ class Ecs(Construct):
                 "REACT_APP_BACKEND_URL": f"https://"
                 + self._config["domain"]["backend_domain"],
                 "REACT_APP_API_KEY": react_app_api_key.get_parameter(),
+                "REACT_APP_WS_URL": "wss://"
+                + self._config["domain"]["backend_domain"]
+                + "/ws/events/",
             },
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="clientwebapp",
@@ -406,6 +409,8 @@ class Ecs(Construct):
                 "DB_PASSWORD": db_password.get_parameter(),
                 "DB_USER": db_user.get_parameter(),
                 "API_KEY": react_app_api_key.get_parameter(),
+                "REDIS_HOST": "0.0.0.0",
+                "REDIS_PORT": "6379",
             },
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="backend",
